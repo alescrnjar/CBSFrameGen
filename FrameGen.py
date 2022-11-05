@@ -70,8 +70,8 @@ model_g_file=directory+'model_generator.pth'
 model_d_file=directory+'model_discriminator.pth'
 
 if train_mode and not load_model: 
-    os.system('rm '+directory+'out*'+desired_format)
-    os.system('rm '+directory+'gen*'+desired_format)
+    os.system('rm '+directory+'out*'+desired_format+' 2> /dev/null')
+    os.system('rm '+directory+'gen*'+desired_format+' 2> /dev/null')
 
 last_epoch=0
 if train_mode and load_model:
@@ -219,7 +219,7 @@ def generate_training_data(prm_top_file,traj_file,frame_i,frame_f):
             lab_val=0
             count_0+=1
         
-        input_dats.append((torch.tensor(sel.positions),lab_val) 
+        input_dats.append((torch.tensor(sel.positions),lab_val)) 
         if (ts.frame==0):
             write_inpcrd(sel.positions,outname=directory+'initial.inpcrd')
     input_dataset=input_dats
