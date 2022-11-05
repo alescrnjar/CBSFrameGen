@@ -152,26 +152,6 @@ def check_label_condition(prm_top_file,rst_file):
     pos_dstz_at1=u.select_atoms('resid 1 and name CA').center_of_mass()
     pos_dstz_at2=u.select_atoms('resid 6 and name CA').center_of_mass()
     return norm(pos_dstz_at1-pos_dstz_at2) 
-
-#def variables_of_rst(prm_top_file,rst_file):
-def variables_of_rst(prm_top_file,rst_array):
-    rst_file='initial.inpcrd'
-    sel=mda.Universe(prm_top_file,rst_file).select_atoms('all')
-    sel.positions=rst_array
-    positions_reshaped=np.array(sel.positions.reshape(1,3*len(sel.positions)))[0]
-    #bonds=sel.bonds.values()
-    #angles=sel.angles.values()
-    #return np.concatenate((bonds,angles))
-    #return np.concatenate((positions_reshaped,bonds))
-    return positions_reshaped
-    
-def variables_of_data(data):
-    variables_list=[]
-    for x in data:
-        #write_inpcrd(x.detach().numpy().reshape(N_at,3),outname='temp_4variables.inpcrd') #AC
-        #variables_list.append(variables_of_rst(prmf,'temp_4variables.'+desired_format))
-        variables_list.append(variables_of_rst(prmf,x.detach().numpy().reshape(N_at,3)))
-    return torch.tensor(np.array(variables_list)).float().to(device)
      
 def ramachandran_verification(prm_top_file,traj_file,png_file=directory+'Ramachandran.png'):
     """
@@ -238,11 +218,8 @@ def generate_training_data(prm_top_file,traj_file,frame_i,frame_f):
         else:
             lab_val=0
             count_0+=1
-            
-        #variables_array=np.concatenate((sel.bonds.values(),sel.angles.values())) #sel.bonds.values()
-        #variables_array=np.concatenate((np.array(sel.positions.reshape(1,3*len(sel.positions)))[0],sel.bonds.values())) #sel.bonds.values()
-        variables_array=np.array(sel.positions.reshape(1,3*len(sel.positions)))[0]
-        input_dats.append((torch.tensor(sel.positions),lab_val,torch.tensor(variables_array).float()))
+        
+        input_dats.append((torch.tensor(sel.positions),lab_val) 
         if (ts.frame==0):
             write_inpcrd(sel.positions,outname=directory+'initial.inpcrd')
     input_dataset=input_dats
@@ -261,15 +238,15 @@ class GeneratorModel(nn.Module):
         n2=100
         n3=200
         self.max_size=max_size
-        self.label_embedding = nn.Embedding(N_lab_vals, N_lab_vals) #cGAN
+        self.label_embedding = nn.Embedding(N_lab_vals, N_lab_vals) 
         self.hidden_layer1 = nn.Sequential(nn.Linear(input_dim, n1), nn.LeakyReLU(0.2)) 
         self.hidden_layer2 = nn.Sequential(nn.Linear(n1, n2), nn.LeakyReLU(0.2)) 
         self.hidden_layer3 = nn.Sequential(nn.Linear(n2, n3), nn.LeakyReLU(0.2)) 
         self.output_layer = nn.Sequential(nn.Linear(n3, output_dim), nn.Tanh()) 
     
-    def forward(self, x, labels): #cGAN
-        c = self.label_embedding(labels) #cGAN
-        x = torch.cat([x,c],1) #cGAN 
+    def forward(self, x, labels): 
+        c = self.label_embedding(labels) 
+        x = torch.cat([x,c],1) 
         output = self.hidden_layer1(x) 
         output = self.hidden_layer2(output)
         output = self.hidden_layer3(output)
@@ -278,22 +255,20 @@ class GeneratorModel(nn.Module):
         return output.to(device)
 
 class DiscriminatorModel(nn.Module):  
-    #def __init__(self,Nvariables,N_lab_vals):
     def __init__(self,Natoms,N_lab_vals):
         super(DiscriminatorModel, self).__init__() 
-        #input_dim = Nvariables + N_lab_vals #cGAN
-        input_dim = 3*Natoms + N_lab_vals #cGAN
+        input_dim = 3*Natoms + N_lab_vals 
         output_dim = 1
         n1=200
         n2=100
         n3=50 
-        self.label_embedding = nn.Embedding(N_lab_vals, N_lab_vals) #cGAN #https://pytorch.org/docs/stable/generated/torch.nn.Embedding.html
-        self.hidden_layer1 = nn.Sequential(nn.Linear(input_dim, n1), nn.LeakyReLU(0.2), nn.Dropout(0.3)) #nn.LeakyReLU(0.2), nn.Dropout(0.3)) #During training, randomly zeroes some of the elements of the input tensor with probability p using samples from a Bernoulli distribution. #https://pytorch.org/docs/stable/nn.html#dropout-layers
-        self.hidden_layer2 = nn.Sequential(nn.Linear(n1, n2), nn.LeakyReLU(0.2), nn.Dropout(0.3)) #nn.LeakyReLU(0.2), nn.Dropout(0.3))
-        self.hidden_layer3 = nn.Sequential(nn.Linear(n2, n3), nn.LeakyReLU(0.2), nn.Dropout(0.3)) #nn.LeakyReLU(0.2), nn.Dropout(0.3))
+        self.label_embedding = nn.Embedding(N_lab_vals, N_lab_vals) 
+        self.hidden_layer1 = nn.Sequential(nn.Linear(input_dim, n1), nn.LeakyReLU(0.2), nn.Dropout(0.3)) 
+        self.hidden_layer2 = nn.Sequential(nn.Linear(n1, n2), nn.LeakyReLU(0.2), nn.Dropout(0.3)) 
+        self.hidden_layer3 = nn.Sequential(nn.Linear(n2, n3), nn.LeakyReLU(0.2), nn.Dropout(0.3)) 
         self.output_layer = nn.Sequential(nn.Linear(n3, output_dim), nn.Sigmoid())
         
-    def forward(self, x, labels): #cGAN
+    def forward(self, x, labels): 
         c = self.label_embedding(labels)
         x = torch.cat([x, c], 1)
         output = self.hidden_layer1(x)
@@ -311,10 +286,6 @@ dataset,atoms_list=generate_training_data(prmf,trajfs,0,nframes-(nframes%trainin
 
 N_at=len(univ.select_atoms('all'))
 print("Number of atoms:",N_at)
-
-#N_cvar=len(variables_of_rst(prmf,directory+'initial.'+desired_format))
-N_cvar=len(variables_of_rst(prmf,univ.select_atoms('all').positions))
-print("Number of collective variables:",N_cvar)
 
 batch_freq=int(nframes/training_parameters["batch_size"]) 
 
@@ -368,31 +339,24 @@ if train_mode:
         for batch_idx, data_input in enumerate(data_loader):
         
             # Generate noise and move it the device
-            noise = torch.randn(batch_size,noise_dim).to(device) # torch.randn: Returns a tensor filled with random numbers from a normal distribution with mean 0 and variance 1 (also called the standard normal distribution).
+            noise = torch.randn(batch_size,noise_dim).to(device) 
             # Forward pass
-            fake_labels=torch.randint(0,N_lab_vals,(batch_size,)).to(device) #cGAN
-            generated_data = generator(noise, fake_labels) # batch_size X 784 #cGAN
+            fake_labels=torch.randint(0,N_lab_vals,(batch_size,)).to(device)
+            generated_data = generator(noise, fake_labels) 
             
             true_data = data_input[0].view(batch_size, 3*N_at).to(device) # batch_size X 784
             digit_labels = data_input[1].to(device) # batch_size
-            true_labels = torch.ones(batch_size).to(device) #all ones, because it means that all actually belong to the distribution!
-
-            true_variables = data_input[2].view(batch_size, N_cvar).to(device) # batch_size X 784
+            true_labels = torch.ones(batch_size).to(device) 
 
             # Clear optimizer gradients        
             discriminator_optimizer.zero_grad()
             # Forward pass with true data as input
-            discriminator_output_for_true_data = discriminator(true_data,digit_labels).view(batch_size) #cGAN #DIFFERENT
-            #discriminator_output_for_true_data = discriminator(true_variables,digit_labels).view(batch_size) #cGAN #DIFFERENT
+            discriminator_output_for_true_data = discriminator(true_data,digit_labels).view(batch_size) 
             # Compute Loss
             true_discriminator_loss = loss(discriminator_output_for_true_data, true_labels) 
-
-            # Calculate collective variables data for generated data
-            #generated_variables = variables_of_data(generated_data.cpu().view(batch_size, 3*N_at)) #DIFFERENT
             
             # Forward pass with generated data as input
-            discriminator_output_for_generated_data = discriminator(generated_data.detach(), fake_labels).view(batch_size) #cGAN #DIFFERENT
-            #discriminator_output_for_generated_data = discriminator(generated_variables, fake_labels).view(batch_size) #cGAN #DIFFERENT #DIFFERENT???
+            discriminator_output_for_generated_data = discriminator(generated_data.detach(), fake_labels).view(batch_size) 
             # Compute Loss
             generator_discriminator_loss = loss(discriminator_output_for_generated_data, torch.zeros(batch_size).to(device)) 
             # Average the loss
@@ -405,16 +369,11 @@ if train_mode:
             # Clear optimizer gradients
             generator_optimizer.zero_grad()        
             # It's a choice to generate the data again 
-            generated_data = generator(noise, fake_labels) #.requires_grad_(False) # batch_size X 784 #cGAN #DIFFERENT????
-            #generated_variables = variables_of_data(generated_data.cpu().view(batch_size, 3*N_at)).requires_grad_(True) #.grad_fn(MulBackward) #0 #DIFFERENT
+            generated_data = generator(noise, fake_labels) #.requires_grad_(False) # batch_size X 784 
             # Forward pass with the generated data
-            discriminator_output_on_generated_data = discriminator(generated_data, fake_labels).view(batch_size) #DIFFERENT
-            #discriminator_output_on_generated_data = discriminator(generated_variables, fake_labels).view(batch_size) #DIFFERENT
+            discriminator_output_on_generated_data = discriminator(generated_data, fake_labels).view(batch_size) 
             # Compute loss: it must be the same of the discriminator, but reversed: the fake data must be passed as all ones, thus we use true_labels
-            generator_loss = loss(discriminator_output_on_generated_data, true_labels) #+ custom_loss_G # To insert a custom loss here implies that the generator refuses, to a certain extend, to its purpose of fooling the discriminator. OR it may mean that the generator is more strict with itself. #DIFFERENT????
-            ###generator_loss = loss(discriminator_output_for_generated_data, true_labels)
-            #generator_loss = custom_loss_G # Cannot be backpropagated
-            #generator_loss = generator_loss.requires_grad_(True)
+            generator_loss = loss(discriminator_output_on_generated_data, true_labels) 
             # Backpropagate losses for Generator model.
             generator_loss.backward()
             generator_optimizer.step()
@@ -427,8 +386,8 @@ if train_mode:
                 with torch.no_grad(): 
                     noise = torch.randn(batch_size,noise_dim).to(device)
                     for dl, d_label in enumerate(desired_labels):
-                        fake_labels = torch.tensor(batch_size*[dl]).to(device) #torch.int(1) #.to(device) #cGAN
-                        generated_data = generator(noise, fake_labels).cpu().view(batch_size, 3*N_at) #cGAN
+                        fake_labels = torch.tensor(batch_size*[dl]).to(device) 
+                        generated_data = generator(noise, fake_labels).cpu().view(batch_size, 3*N_at) 
                         for x in generated_data:
 
                             # Generate .inpcrd file
@@ -439,7 +398,7 @@ if train_mode:
                             # Calculate observables for later evaluation of the training
                             e2e_distance[dl].append([epoch_idx,check_label_condition(prmf,outname)])
                             bonds_dev[dl].append([epoch_idx,bonds_deviation(prmf,outname)])
-                            angles_dev[dl].append([epoch_idx,angles_deviation(prmf,outname)]) #[0],angles_deviation(prmf,outname)[1]])
+                            angles_dev[dl].append([epoch_idx,angles_deviation(prmf,outname)]) 
                             torch.save(generator.state_dict(),model_g_file) 
                             torch.save(discriminator.state_dict(),model_d_file) 
                             break
@@ -453,8 +412,6 @@ if train_mode:
     # Plot losses and observables
     for dl, d_label in enumerate(desired_labels):
         plt.plot(np.array(bonds_dev[dl])[:, 0], np.array(bonds_dev[dl])[:, 1],lw=1,c='C0',label='Bonds dev. [$\AA$]')
-        #plt.plot(np.array(angles_dev[dl])[:, 0], np.array(angles_dev[dl])[:, 1],lw=1,c='C1',label='Sin dev.')
-        #plt.plot(np.array(angles_dev[dl])[:, 0], np.array(angles_dev[dl])[:, 2],lw=1,c='C2',label='Cos dev.')
         plt.plot(np.array(angles_dev[dl])[:, 0], np.array(angles_dev[dl])[:, 1],lw=1,c='C1',label='Angle dev. [deg]')
         plt.legend(loc='upper right',prop={'size':15})
         plt.xlabel('Epoch')
@@ -482,8 +439,8 @@ else:
         with torch.no_grad(): 
             noise = torch.randn(batch_size,noise_dim).to(device)
             for dl,d_label in enumerate(desired_labels):
-                fake_labels = torch.tensor(batch_size*[dl]).to(device) #cGAN
-                generated_data = generator(noise, fake_labels).cpu().view(batch_size, 3*N_at) #cGAN
+                fake_labels = torch.tensor(batch_size*[dl]).to(device) 
+                generated_data = generator(noise, fake_labels).cpu().view(batch_size, 3*N_at) 
                 for x in generated_data:
                     outname='gen_'+outmode+'_label'+str(fake_labels[0].item())+'_epoch'+str(structure_idx+1)+'.inpcrd' #rst'
                     write_inpcrd(x.detach().numpy().reshape(N_at,3),outname=directory+outname)
