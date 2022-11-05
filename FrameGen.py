@@ -325,6 +325,7 @@ if train_mode:
     e2e_distance=[]
     bonds_dev=[]
     angles_dev=[]
+    losses_fig=plt.figure(1, figsize=(4, 4))
     obs_fig=[]
     e2e_fig=plt.figure(1, figsize=(4, 4))
     for dl, d_label in enumerate(desired_labels):
@@ -409,7 +410,16 @@ if train_mode:
         if (epoch_idx+1)%log_freq==0:
             print('[%d/%d]: loss_d: %.3f, loss_g: %.3f' % ( (epoch_idx+last_epoch+1), n_epochs+last_epoch, torch.mean(torch.FloatTensor(D_loss)), torch.mean(torch.FloatTensor(G_loss))))
 
-    # Plot losses and observables
+    # Plot losses
+    plt.plot(np.array(range(len(D_loss))), np.array(D_loss),lw=1,c='C0',label='Loss D')
+    plt.plot(np.array(range(len(G_loss))), np.array(G_loss),lw=1,c='C1',label='Loss G')
+    plt.legend(loc='upper right',prop={'size':15})
+    plt.xlabel('Epoch')
+    losses_fig.savefig(directory+'Losses.png',dpi=150)
+    #plt.show()
+    plt.clf()
+
+    # Plot observables
     for dl, d_label in enumerate(desired_labels):
         plt.plot(np.array(bonds_dev[dl])[:, 0], np.array(bonds_dev[dl])[:, 1],lw=1,c='C0',label='Bonds dev. [$\AA$]')
         plt.plot(np.array(angles_dev[dl])[:, 0], np.array(angles_dev[dl])[:, 1],lw=1,c='C1',label='Angle dev. [deg]')
