@@ -26,6 +26,7 @@ As a case-study, the software LEaP and CPPTRAJ (AmberTools) were used to generat
 A Ramachandran plot of the phi and psi angles is also checked against that of the initial frame.
 
 # Visualization
+
 The output .inpcrd files can be visualized with VMD (or pymol): load the parameter and topology files as "AMBER7 Parm", then the .incprd as "AMBER7 Restart"
 
 # Further improvements
