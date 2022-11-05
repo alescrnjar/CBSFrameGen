@@ -30,6 +30,8 @@ ParmEd: 3.4.3
 
 As a case-study, the software LEaP and CPPTRAJ (AmberTools21) were used to generate 10,000 conformations of a simply peptide (sequence TAGGKS), and arranged in a trajectory file. Approximately half of the frames satisfy the condition of end-to-end distance smaller than 1 nm, whereas the other half do not. This was chosen as the condition to feed to the cGAN.
 
+![alt text](https://github.com/alescrnjar/FrameGen/blob/main/End2end_distances.png)
+
 # Visualization
 
 The output .inpcrd files can be visualized with VMD (or pymol): load the parameter and topology files as "AMBER7 Parm", then the .incprd as "AMBER7 Restart"
