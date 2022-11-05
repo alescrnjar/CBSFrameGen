@@ -10,13 +10,13 @@ Both the generator and the discriminator make use of a Binary Cross Entropy func
 
 The generator takes as input gaussian random noise of custom size (default: 100). Its output is 3N dimensional, with N being the number of atoms, and is written in an .inpcrd file according to AMBER format.
 
-The activation function for the output layer of the generator is chosen as hyperbolic tangent, multiplied by the maximum size max_s of the system. This consist in the largest absolute x, y, or z coordinate of any atom during trajectory (multiplied by 1.1 in order to allow for fluctuations). Thus, the output is guaranteed to be generated within -max_s and +max_s in every direction.
+The activation function for the output layer of the generator is chosen as hyperbolic tangent, multiplied by the maximum size box_s of the system. This consist in the largest absolute x, y, or z coordinate of any atom during trajectory (multiplied by 1.1 in order to allow for fluctuations). Thus, the output is guaranteed to be generated within -box_s and +box_s in every direction.
 
 The library ParmEd (which is part of the package AmberTools) is used to check the maximum deviation of bonds and angles from their equilibrium values, according to the force-field used for parametrisation (ff14SB).
 
 The output .inpcrd files can be visualized with VMD (or pymol): load the parameter and topology files as "AMBER7 Parm", then the .incprd as "AMBER7 Restart"
 
-# Required libraries
+# Required Libraries
 
 Python modules required: 
 
@@ -28,13 +28,15 @@ MDAnalysis : 2.2.0
 
 ParmEd: 3.4.3 
 
+tensorboardX: 2.5.1
+
 # Case Study
 
 As a case-study, the software LEaP and CPPTRAJ (AmberTools21) were used to generate 10,000 conformations of a simply peptide (sequence TAGGKS), and arranged in a trajectory file. Approximately half of the frames satisfy the condition of end-to-end distance smaller than 1 nm, whereas the other half do not. This was chosen as the condition to feed to the cGAN.
 
 ![alt text](https://github.com/alescrnjar/FrameGen/blob/main/Initial_Label0_Label1.png)
 
-
+![alt text](https://github.com/alescrnjar/FrameGen/blob/main/Losses.png)
 
 
 
