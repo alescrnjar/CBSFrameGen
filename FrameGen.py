@@ -163,7 +163,7 @@ def ramachandran_verification(prm_top_file,traj_file,png_file=directory+'Ramacha
     R = Ramachandran(r).run()
     fig, ax = plt.subplots(figsize=plt.figaspect(1))
     R.plot(ax=ax, color='k', marker='s')
-    fig.savefig(png_file,dpi=120)
+    fig.savefig(png_file,dpi=150)
     print("Ramachandran plot produced.")
     plt.clf()
     
@@ -415,8 +415,8 @@ if train_mode:
         plt.plot(np.array(angles_dev[dl])[:, 0], np.array(angles_dev[dl])[:, 1],lw=1,c='C1',label='Angle dev. [deg]')
         plt.legend(loc='upper right',prop={'size':15})
         plt.xlabel('Epoch')
-        obs_fig[dl].savefig(directory+'Observables_label'+str(d_label)+'.png',dpi=300)
-        plt.show()
+        obs_fig[dl].savefig(directory+'Observables_label'+str(d_label)+'.png',dpi=150)
+        #plt.show()
         plt.clf()
 
     # Plot the end-to-end distances
@@ -425,8 +425,8 @@ if train_mode:
     plt.xlabel('Epoch')
     plt.ylabel('End-to-end distance [$\AA$]')
     plt.legend(loc='upper right',prop={'size':15})
-    e2e_fig.savefig(directory+'End2end_distances.png',dpi=300)
-    plt.show()
+    e2e_fig.savefig(directory+'End2end_distances.png',dpi=150)
+    #plt.show()
     plt.clf()
     
     # Make Ramachandran plot for current structure
