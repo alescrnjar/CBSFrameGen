@@ -1,3 +1,5 @@
+# FrameGen
+
 FrameGen is a conditional Generative Adversarial Network (cGAN) which, given the AMBER parameter and topology file of a biological system (.prmtop, .top) and an associated molecular dynamics (MD) trajectory (.dcd, .nc, ...), reconstructs a frame belonging to the same distribution of the sampled trajectory. Moreover, it is given a label (0 or 1) which allow to distinguish between frames with an observed condition from those without.
 
 This code is based on the cGAN example provided at this link: https://medium.com/analytics-vidhya/step-by-step-implementation-of-conditional-generative-adversarial-networks-54e4b47497d6
