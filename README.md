@@ -15,15 +15,16 @@ The activation function for the output layer of the generator is chosen as hyper
 The library ParmEd (which is part of the package AmberTools) is used to check the maximum deviation of bonds and angles from their equilibrium values, according to the force-field used for parametrisation (ff14SB).
 
 # Required libraries
-PyTORCH modules required: 
 
-MDAnalysis : 2.2.0
-
-torch : 1.12.1+cu116
+Python modules required: 
 
 numpy : 1.22.3
 
-ParmEd: 3.4.3
+torch : 1.12.1+cu116
+
+MDAnalysis : 2.2.0
+
+ParmEd: 3.4.3 
 
 # Demonstrative Run
 
