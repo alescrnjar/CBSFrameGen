@@ -333,7 +333,9 @@ if train_mode:
         bonds_dev.append([])
         angles_dev.append([])
         obs_fig.append(plt.figure(1, figsize=(4, 4)))
-        
+    
+    Loss_G_mean = []
+    Loss_D_mean = []
     for epoch_idx in range(n_epochs): 
         G_loss = [] 
         D_loss = []    
@@ -407,12 +409,15 @@ if train_mode:
         if (epoch_idx+1)%epoch_freq==0:
             summary_writer.add_scalar('Loss_d',torch.mean(torch.FloatTensor(D_loss)),global_step=epoch_idx)
             summary_writer.add_scalar('Loss_g',torch.mean(torch.FloatTensor(G_loss)),global_step=epoch_idx)
+            Loss_D_mean.append(torch.mean(torch.FloatTensor(D_loss)))
+            Loss_G_mean.append(torch.mean(torch.FloatTensor(G_loss)))
+
         if (epoch_idx+1)%log_freq==0:
             print('[%d/%d]: loss_d: %.3f, loss_g: %.3f' % ( (epoch_idx+last_epoch+1), n_epochs+last_epoch, torch.mean(torch.FloatTensor(D_loss)), torch.mean(torch.FloatTensor(G_loss))))
 
-    # Plot losses
-    plt.plot(np.array(range(len(D_loss))), np.array(D_loss),lw=1,c='C0',label='Loss D')
-    plt.plot(np.array(range(len(G_loss))), np.array(G_loss),lw=1,c='C1',label='Loss G')
+    # Plot loss averages over batches
+    plt.plot(np.array(range(len(Loss_D_mean))), np.array(Loss_D_mean),lw=1,c='C0',label='Loss D')
+    plt.plot(np.array(range(len(Loss_G_mean))), np.array(Loss_G_mean),lw=1,c='C1',label='Loss G')
     plt.legend(loc='upper right',prop={'size':15})
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
