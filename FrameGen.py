@@ -415,6 +415,7 @@ if train_mode:
     plt.plot(np.array(range(len(G_loss))), np.array(G_loss),lw=1,c='C1',label='Loss G')
     plt.legend(loc='upper right',prop={'size':15})
     plt.xlabel('Epoch')
+    plt.ylabel('Loss')
     losses_fig.savefig(directory+'Losses.png',dpi=150)
     #plt.show()
     plt.clf()
