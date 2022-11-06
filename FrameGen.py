@@ -18,18 +18,18 @@ import parmed
 #
 from tensorboardX import SummaryWriter  
 
-input_directory='/home/acrnjar/Desktop/TEMP/Peptides_gen/' 
-prmf=input_directory+'peptide.prmtop' # Parameter and topology file
-trajfs=[input_directory+'all_conformations.mdcrd'] # Trajectory files list
+input_directory = '/home/acrnjar/Desktop/TEMP/Peptides_gen/' 
+prmf = input_directory+'peptide.prmtop' # Parameter and topology file
+trajfs = [input_directory+'all_conformations.mdcrd'] # Trajectory files list
 
 # Necessary for atom selections (see below)
-biosystem='PROTEIN'
-#biosystem='DNA'
+biosystem = 'PROTEIN'
+#biosystem = 'DNA'
 
-train_mode=True # Set to False for Test mode.
-load_model=False 
+train_mode = True # Set to False for Test mode.
+load_model = False 
 
-desired_format='inpcrd' 
+desired_format = 'inpcrd' 
 
 N_lab_vals = 2 # Number of classes.
 desired_labels = [0,1] # Classes to be considered for output
@@ -45,11 +45,12 @@ log_freq = 100 # Verbose output will be printed every this many epochs
 
 learning_rate = 0.0002 # Learning rate for Adam optimizer
 
-directory = './' # Directory for output
+directory = './example_output/' # Directory for output
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
 print("Output will be written in:",directory)
+if not os.path.exists(directory): os.system('mkdir '+directory)
 
 print("Cuda is available:",torch.cuda.is_available())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -69,10 +70,12 @@ else:
 model_g_file=directory+'model_generator.pth'
 model_d_file=directory+'model_discriminator.pth'
 
-if train_mode and not load_model: 
-    os.system('rm '+directory+'out*'+desired_format+' 2> /dev/null')
+# Remove previous output if necessary
+if train_mode:
     os.system('rm '+directory+'gen*'+desired_format+' 2> /dev/null')
-
+    if not load_model:
+        os.system('rm '+directory+'out*'+desired_format+' 2> /dev/null')
+        
 last_epoch=0
 if train_mode and load_model:
     prefixed = [filename for filename in os.listdir(directory) if filename.startswith("out_train_label1_epoch")]
@@ -113,11 +116,11 @@ def max_size(prm_top_file,trajectory_file,selection='all',factor=1.0):
     # A factor can be multiplied in order to allow some fluctuations on the protein surface
     return(factor*max(all_maxm))
 
-def bonds_deviation(prm_top_file,rst_file):
+def bonds_deviation(prm_top_file,inpcrd_file):
     """
     Root mean square deviation of bonds with respect to their equilibrium value (defined by the force field).
     """
-    myparams=parmed.amber.readparm.AmberParm(prm_top_file,xyz=rst_file)
+    myparams=parmed.amber.readparm.AmberParm(prm_top_file,xyz=inpcrd_file)
     bonds=parmed.tools.actions.printBonds(myparams,'!(:WAT,Na+,Cl-)') 
     dev2s=[]
     for line in str(bonds).split('\n'):
@@ -127,11 +130,11 @@ def bonds_deviation(prm_top_file,rst_file):
             dev2s.append((Req-Distance)**2)
     return np.sqrt(np.mean(dev2s))
 
-def angles_deviation(prm_top_file,rst_file):
+def angles_deviation(prm_top_file,inpcrd_file):
     """
     Root mean square deviation of angles with respect to their equilibrium value (defined by the force field). 
     """
-    myparams=parmed.amber.readparm.AmberParm(prm_top_file,xyz=rst_file)
+    myparams=parmed.amber.readparm.AmberParm(prm_top_file,xyz=inpcrd_file)
     angles=parmed.tools.actions.printAngles(myparams,'!(:WAT,Na+,Cl-)') 
     dev2s=[]
     for line in str(angles).split('\n'):
@@ -143,11 +146,11 @@ def angles_deviation(prm_top_file,rst_file):
             dev2s.append(difference)
     return np.sqrt(np.mean(dev2s))
 
-def check_label_condition(prm_top_file,rst_file):
+def check_label_condition(prm_top_file,inpcrd_file):
     """
     Returns the observable responsible for the class definition.
     """
-    u=mda.Universe(prm_top_file,rst_file)
+    u=mda.Universe(prm_top_file,inpcrd_file)
     dist_cut=10.0
     pos_dstz_at1=u.select_atoms('resid 1 and name CA').center_of_mass()
     pos_dstz_at2=u.select_atoms('resid 6 and name CA').center_of_mass()
@@ -399,9 +402,9 @@ if train_mode:
                             if (epoch_idx+1)%log_freq==0: print("{} written.".format(outname))
 
                             # Calculate observables for later evaluation of the training
-                            e2e_distance[dl].append([epoch_idx,check_label_condition(prmf,outname)])
-                            bonds_dev[dl].append([epoch_idx,bonds_deviation(prmf,outname)])
-                            angles_dev[dl].append([epoch_idx,angles_deviation(prmf,outname)]) 
+                            e2e_distance[dl].append([epoch_idx,check_label_condition(prmf,directory+outname)])
+                            bonds_dev[dl].append([epoch_idx,bonds_deviation(prmf,directory+outname)])
+                            angles_dev[dl].append([epoch_idx,angles_deviation(prmf,directory+outname)]) 
                             torch.save(generator.state_dict(),model_g_file) 
                             torch.save(discriminator.state_dict(),model_d_file) 
                             break
@@ -409,15 +412,15 @@ if train_mode:
         if (epoch_idx+1)%epoch_freq==0:
             summary_writer.add_scalar('Loss_d',torch.mean(torch.FloatTensor(D_loss)),global_step=epoch_idx)
             summary_writer.add_scalar('Loss_g',torch.mean(torch.FloatTensor(G_loss)),global_step=epoch_idx)
-            Loss_D_mean.append(torch.mean(torch.FloatTensor(D_loss)))
-            Loss_G_mean.append(torch.mean(torch.FloatTensor(G_loss)))
+            Loss_D_mean.append([epoch_idx,torch.mean(torch.FloatTensor(D_loss))])
+            Loss_G_mean.append([epoch_idx,torch.mean(torch.FloatTensor(G_loss))])
 
         if (epoch_idx+1)%log_freq==0:
             print('[%d/%d]: loss_d: %.3f, loss_g: %.3f' % ( (epoch_idx+last_epoch+1), n_epochs+last_epoch, torch.mean(torch.FloatTensor(D_loss)), torch.mean(torch.FloatTensor(G_loss))))
 
     # Plot loss averages over batches
-    plt.plot(np.array(range(len(Loss_D_mean))), np.array(Loss_D_mean),lw=1,c='C0',label='Loss D')
-    plt.plot(np.array(range(len(Loss_G_mean))), np.array(Loss_G_mean),lw=1,c='C1',label='Loss G')
+    plt.plot(np.array(Loss_D_mean)[:, 0], np.array(Loss_D_mean)[:, 1],lw=1,c='C0',label='Loss D')
+    plt.plot(np.array(Loss_G_mean)[:, 0], np.array(Loss_G_mean)[:, 1],lw=1,c='C1',label='Loss G')
     plt.legend(loc='upper right',prop={'size':15})
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
@@ -446,7 +449,7 @@ if train_mode:
     plt.clf()
     
     # Make Ramachandran plot for current structure
-    ramachandran_verification(prmf,outname,directory+'Ramachandran_epoch'+str(epoch_idx)+'.png')
+    ramachandran_verification(prmf,directory+outname,directory+'Ramachandran_epoch'+str(epoch_idx)+'.png')
 
 # Test mode
 else: 
@@ -458,7 +461,7 @@ else:
                 fake_labels = torch.tensor(batch_size*[dl]).to(device) 
                 generated_data = generator(noise, fake_labels).cpu().view(batch_size, 3*N_at) 
                 for x in generated_data:
-                    outname='gen_'+outmode+'_label'+str(fake_labels[0].item())+'_epoch'+str(structure_idx+1)+'.inpcrd' #rst'
+                    outname='gen_'+outmode+'_label'+str(fake_labels[0].item())+'_'+str(structure_idx+1)+'.inpcrd' 
                     write_inpcrd(x.detach().numpy().reshape(N_at,3),outname=directory+outname)
                     print("{} written.".format(outname))
                     break
