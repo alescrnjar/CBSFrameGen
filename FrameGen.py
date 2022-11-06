@@ -329,13 +329,15 @@ if train_mode:
     bonds_dev=[]
     angles_dev=[]
     losses_fig=plt.figure(1, figsize=(4, 4))
-    obs_fig=[]
     e2e_fig=plt.figure(1, figsize=(4, 4))
+    bonds_fig=[]
+    angles_fig=[]
     for dl, d_label in enumerate(desired_labels):
         e2e_distance.append([])
         bonds_dev.append([])
         angles_dev.append([])
-        obs_fig.append(plt.figure(1, figsize=(4, 4)))
+        bonds_fig.append(plt.figure(1, figsize=(4, 4)))
+        angles_fig.append(plt.figure(1, figsize=(4, 4)))
     
     Loss_G_mean = []
     Loss_D_mean = []
@@ -430,11 +432,16 @@ if train_mode:
 
     # Plot observables
     for dl, d_label in enumerate(desired_labels):
-        plt.plot(np.array(bonds_dev[dl])[:, 0], np.array(bonds_dev[dl])[:, 1],lw=1,c='C0',label='Bonds dev. [$\AA$]')
-        plt.plot(np.array(angles_dev[dl])[:, 0], np.array(angles_dev[dl])[:, 1],lw=1,c='C1',label='Angle dev. [deg]')
-        plt.legend(loc='upper right',prop={'size':15})
+        plt.plot(np.array(bonds_dev[dl])[:, 0], np.array(bonds_dev[dl])[:, 1],lw=1,c='C0')
         plt.xlabel('Epoch')
-        obs_fig[dl].savefig(directory+'Observables_label'+str(d_label)+'.png',dpi=150)
+        plt.ylabel('Bonds dev. [$\AA$]')
+        bonds_fig[dl].savefig(directory+'Bonds_deviation_label'+str(d_label)+'.png',dpi=150)
+        #plt.show()
+        plt.clf()
+        plt.plot(np.array(angles_dev[dl])[:, 0], np.array(angles_dev[dl])[:, 1],lw=1,c='C1')
+        plt.xlabel('Epoch')
+        plt.ylabel('Angle dev. [deg]')
+        angles_fig[dl].savefig(directory+'Angles_deviation_label'+str(d_label)+'.png',dpi=150)
         #plt.show()
         plt.clf()
 
