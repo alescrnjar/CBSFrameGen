@@ -6,7 +6,6 @@ import MDAnalysis as mda
 from MDAnalysis.lib.distances import distance_array 
 from numpy.linalg import norm
 import MDAnalysis.analysis.rms
-from MDAnalysis.analysis.dihedrals import Dihedral, Ramachandran
 from MDAnalysis.analysis import align
 from MDAnalysisData import datasets
 #
@@ -155,20 +154,6 @@ def check_label_condition(prm_top_file,inpcrd_file):
     pos_dstz_at1=u.select_atoms('resid 1 and name CA').center_of_mass()
     pos_dstz_at2=u.select_atoms('resid 6 and name CA').center_of_mass()
     return norm(pos_dstz_at1-pos_dstz_at2) 
-     
-def ramachandran_verification(prm_top_file,traj_file,png_file=directory+'Ramachandran.png'):
-    """
-    Make Ramachandran plot for a trajectory.
-    """
-    # https://docs.mdanalysis.org/1.1.0/documentation_pages/analysis/dihedrals.html
-    u = mda.Universe(prm_top_file,traj_file)
-    r = u.select_atoms("protein")
-    R = Ramachandran(r).run()
-    fig, ax = plt.subplots(figsize=plt.figaspect(1))
-    R.plot(ax=ax, color='k', marker='s')
-    fig.savefig(png_file,dpi=150)
-    print("Ramachandran plot produced.")
-    plt.clf()
     
 def generate_training_data(prm_top_file,traj_file,frame_i,frame_f):
     """
@@ -296,9 +281,6 @@ batch_freq=int(nframes/training_parameters["batch_size"])
 
 # Calculate largest coordinate for generation.
 box_s=max_size(prmf,trajfs,'all',1.1)
-
-# Make Ramachandran plot for initial structure
-ramachandran_verification(prmf,directory+'initial.'+desired_format,directory+'Ramachandran_initial.png')
 
 discriminator = DiscriminatorModel(N_at,N_lab_vals) 
 #discriminator = DiscriminatorModel(N_cvar,N_lab_vals) 
@@ -454,9 +436,6 @@ if train_mode:
     e2e_fig.savefig(directory+'End2end_distances.png',dpi=150)
     #plt.show()
     plt.clf()
-    
-    # Make Ramachandran plot for current structure
-    ramachandran_verification(prmf,directory+outname,directory+'Ramachandran_epoch'+str(epoch_idx)+'.png')
 
 # Test mode
 else: 
