@@ -20,7 +20,7 @@ The output .inpcrd files can be visualized with VMD (or pymol): load the paramet
 
 Python modules required: 
 
-numpy [>=] 1.22.3
+numpy >= 1.22.3
 
 torch >= 1.12.1+cu116
 
