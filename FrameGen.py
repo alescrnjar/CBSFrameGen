@@ -20,65 +20,43 @@ from tensorboardX import SummaryWriter
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--biosystem', default='PROTEIN', type=str) # Necessary for atom selections (see below)
+
+# Mode settings
 parser.add_argument('--train_mode', default=True, type=bool) # Set to False for Test mode.
 parser.add_argument('--load_model', default=False, type=bool)
-parser.add_argument('--desired_format', default='inpcrd', type=str)
+
+# Classes settings
+parser.add_argument('--dist_cut', default=10.0, type=float) # distance cut-off for class defintion
 parser.add_argument('--N_classes', default=2, type=int) # Number of classes
 parser.add_argument('--desired_labels', default=[0,1], type=list) # Classes to be considered for output
-parser.add_argument('--noise_dim', default=100, type=int) # Dimension for gaussian noise to feed to the generator
-parser.add_argument('--n_structures', default=10, type=int) # Number of structures to be generated for every class (only in Test mode)
-parser.add_argument('--epoch_freq', default=10, type=int) # Output will be generated every this many epochs
-parser.add_argument('--log_freq', default=100, type=int) # Verbose output will be printed every this many epochs
-parser.add_argument('--learning_rate', default=0.0002, type=float) # Learning rate for Adam optimizer
-parser.add_argument('--dist_cut', default=10.0, type=float) # distance cut-off for class defintion
-parser.add_argument('--input_directory', default='./example_input/' , type=str) 
-parser.add_argument('--output_directory', default='./example_output/', type=str) 
+
+# Bio-system settings
+parser.add_argument('--biosystem', default='PROTEIN', type=str) # Necessary for atom selections (see below)
+
+# Model settings
 parser.add_argument('--n_epochs', default=1000, type=int) # Number of epochs for training
 parser.add_argument('--batch_size', default=100, type=int) # Batch size for training
+parser.add_argument('--learning_rate', default=0.0002, type=float) # Learning rate for Adam optimizer
+parser.add_argument('--noise_dim', default=100, type=int) # Dimension for gaussian noise to feed to the generator
+
+# Output settings
+parser.add_argument('--desired_format', default='inpcrd', type=str)
+parser.add_argument('--epoch_freq', default=10, type=int) # Output will be generated every this many epochs
+parser.add_argument('--log_freq', default=100, type=int) # Verbose output will be printed every this many epochs
+parser.add_argument('--n_structures', default=10, type=int) # Number of structures to be generated for every class (only in Test mode)
+parser.add_argument('--input_directory', default='./example_input/' , type=str) 
+parser.add_argument('--output_directory', default='./example_output/', type=str) 
+
 args = parser.parse_args()
 
 prmf = args.input_directory+'peptide.prmtop' # Parameter and topology file
 #trajfs = [args.input_directory+'all_conformations.mdcrd'] # Trajectory files list
 trajfs = ['/home/acrnjar/Desktop/TEMP/Peptides_gen/all_conformations.mdcrd'] # Trajectory files list
 
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
-
-print("Output will be written in:",args.output_directory)
-if not os.path.exists(args.output_directory): os.system('mkdir '+args.output_directory)
-
 print("Cuda is available:",torch.cuda.is_available())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-if args.biosystem=='PROTEIN':
-    backbone='name CA C N'
-elif args.biosystem=='DNA':
-    backbone='name P'
-
-print("train_mode:",args.train_mode)
-print("load_model:",args.load_model)
-if args.train_mode:
-    outmode='train'
-else:
-    outmode='eval'
-
-model_g_file=args.output_directory+'model_generator.pth'
-model_d_file=args.output_directory+'model_discriminator.pth'
-
-# Remove previous output if necessary
-if args.train_mode:
-    os.system('rm '+args.output_directory+'gen*'+args.desired_format+' 2> /dev/null')
-    if not args.load_model:
-        os.system('rm '+args.output_directory+'out*'+args.desired_format+' 2> /dev/null')
-        
-last_epoch=0
-if args.train_mode and args.load_model:
-    prefixed = [filename for filename in os.listdir(args.output_directory) if filename.startswith("out_train_label1_epoch")]
-    past_epochs=[]
-    for wfile in prefixed:
-        past_epochs.append(int(wfile.replace('out_train_label1_epoch','').replace('.'+desired_format,'')))
-    last_epoch=max(past_epochs)
-    print("Last epoch found:",last_epoch)
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
 ### ### ### FUNCTIONS
 
@@ -150,31 +128,31 @@ def check_label_condition(prm_top_file,inpcrd_file):
     pos_dstz_at2=u.select_atoms('resid 6 and name CA').center_of_mass()
     return norm(pos_dstz_at1-pos_dstz_at2) 
     
-def generate_training_data(prm_top_file,traj_file,frame_i,frame_f):
+def generate_training_data(prm_top_file, traj_file, frame_i, frame_f, backbone, dist_cut, output_dir):
     """
     Generate training dataset.
     """
-    u=mda.Universe(prm_top_file,traj_file)
-    input_dats=[]
-    count_0=0
-    count_1=0
-    at_list=[]
-    listed=False
+    u = mda.Universe(prm_top_file, traj_file)
+    input_dats = []
+    count_0 = 0
+    count_1 = 0
+    at_list = []
+    listed = False
 
-    ref_u=u
+    ref_u = u
     ref_u.trajectory[0]
-    ref_pos=ref_u.select_atoms(backbone).positions - ref_u.atoms.center_of_mass() #backbone works with both proteins and DNA
+    ref_pos = ref_u.select_atoms(backbone).positions - ref_u.atoms.center_of_mass() #backbone works with both proteins and DNA
     
     for ts in u.trajectory[frame_i:frame_f:1]:
 
         # Align the current frame to the first one
-        prot_pos=u.select_atoms(backbone).positions - u.atoms.center_of_mass()
+        prot_pos = u.select_atoms(backbone).positions - u.atoms.center_of_mass()
         R_matrix, R_rmsd = align.rotation_matrix(prot_pos,ref_pos)
         u.atoms.translate(-u.select_atoms(backbone).center_of_mass())
         u.atoms.rotate(R_matrix)
         u.atoms.translate(ref_u.select_atoms(backbone).center_of_mass())
 
-        sel=u.select_atoms('all')
+        sel = u.select_atoms('all')
 
         # Make atom list with atom names and coordinates
         if not listed:
@@ -185,24 +163,24 @@ def generate_training_data(prm_top_file,traj_file,frame_i,frame_f):
                 at_list[-1].append(at_sel.residues.resnames[0])
                 at_list[-1].append(at_sel.atoms.names[0])
                 at_list[-1].append(at_sel.atoms.ids[0])
-                listed=True
+                listed = True
 
         # Define observable for labeling data
-        pos_dstz_at1=u.select_atoms('resid 1 and name CA').center_of_mass()
-        pos_dstz_at2=u.select_atoms('resid 6 and name CA').center_of_mass()
-        dist_dstz=norm(pos_dstz_at1-pos_dstz_at2)
+        pos_dstz_at1 = u.select_atoms('resid 1 and name CA').center_of_mass()
+        pos_dstz_at2 = u.select_atoms('resid 6 and name CA').center_of_mass()
+        dist_dstz = norm(pos_dstz_at1-pos_dstz_at2)
 
         # Assign label 
-        if (dist_dstz<args.dist_cut): 
-            lab_val=1
-            count_1+=1
+        if (dist_dstz < dist_cut): 
+            lab_val = 1
+            count_1 += 1
         else:
-            lab_val=0
-            count_0+=1
+            lab_val = 0
+            count_0 += 1
         
         input_dats.append((torch.tensor(sel.positions),lab_val)) 
-        if (ts.frame==0):
-            write_inpcrd(sel.positions,outname=args.output_directory+'initial.inpcrd')
+        if (ts.frame == 0):
+            write_inpcrd(sel.positions,outname=output_dir+'initial.inpcrd')
     input_dataset=input_dats
     print("{} frames with label 0, {} frames with label 1.".format(count_0,count_1))
     return input_dataset,at_list
@@ -211,14 +189,14 @@ def generate_training_data(prm_top_file,traj_file,frame_i,frame_f):
 
 class GeneratorModel(nn.Module):
     #def __init__(self,Natoms,Nclasses,max_size):
-    def __init__(self,Natoms,noise_dimension,Nclasses,max_size): 
+    def __init__(self,Natoms,noise_dimension,Nclasses,max_size, n1=50, n2=100, n3=200): 
         super(GeneratorModel, self).__init__() 
         input_dim = noise_dimension + Nclasses 
         output_dim = 3*Natoms
-        n1=50
-        n2=100
-        n3=200
-        self.max_size=max_size
+        n1 = 50
+        n2 = 100
+        n3 = 200
+        self.max_size = max_size
         self.label_embedding = nn.Embedding(Nclasses, Nclasses) 
         self.hidden_layer1 = nn.Sequential(nn.Linear(input_dim, n1), nn.LeakyReLU(0.2)) 
         self.hidden_layer2 = nn.Sequential(nn.Linear(n1, n2), nn.LeakyReLU(0.2)) 
@@ -236,13 +214,10 @@ class GeneratorModel(nn.Module):
         return output.to(device)
 
 class DiscriminatorModel(nn.Module):  
-    def __init__(self,Natoms,Nclasses):
+    def __init__(self,Natoms,Nclasses, n1=200, n2=100, n3=50):
         super(DiscriminatorModel, self).__init__() 
         input_dim = 3*Natoms + Nclasses 
         output_dim = 1
-        n1=200
-        n2=100
-        n3=50 
         self.label_embedding = nn.Embedding(Nclasses, Nclasses) 
         self.hidden_layer1 = nn.Sequential(nn.Linear(input_dim, n1), nn.LeakyReLU(0.2), nn.Dropout(0.3)) 
         self.hidden_layer2 = nn.Sequential(nn.Linear(n1, n2), nn.LeakyReLU(0.2), nn.Dropout(0.3)) 
@@ -262,23 +237,49 @@ class DiscriminatorModel(nn.Module):
 
 def main():
 
-    univ=mda.Universe(prmf,trajfs)
-    nframes=len(univ.trajectory)
+    print("Output will be written in:",args.output_directory)
+    if not os.path.exists(args.output_directory): os.system('mkdir '+args.output_directory)
 
-    dataset,atoms_list=generate_training_data(prmf,trajfs,0,nframes-(nframes%args.batch_size))
+    if args.biosystem=='PROTEIN':
+        backbone='name CA C N'
+    elif args.biosystem=='DNA':
+        backbone='name P'
 
-    N_at=len(univ.select_atoms('all'))
-    print("Number of atoms:",N_at)
+    print("train_mode:",args.train_mode)
+    print("load_model:",args.load_model)
 
-    batch_freq=int(nframes/args.batch_size) 
+    model_g_file=args.output_directory+'model_generator.pth'
+    model_d_file=args.output_directory+'model_discriminator.pth'
 
-    ### ### ###
+    # Remove previous output if necessary
+    if args.train_mode:
+        os.system('rm '+args.output_directory+'gen*'+args.desired_format+' 2> /dev/null')
+        if not args.load_model:
+            os.system('rm '+args.output_directory+'out*'+args.desired_format+' 2> /dev/null')
 
-    # Calculate largest coordinate for generation.
-    box_s=max_size(prmf,trajfs,'all',1.1)
+    # Determine last saved epoch   
+    last_epoch=0
+    if args.train_mode and args.load_model:
+        prefixed = [filename for filename in os.listdir(args.output_directory) if filename.startswith("out_train_label1_epoch")]
+        past_epochs=[]
+        for wfile in prefixed:
+            past_epochs.append(int(wfile.replace('out_train_label1_epoch','').replace('.'+desired_format,'')))
+        last_epoch=max(past_epochs)
+        print("Last epoch found:",last_epoch)
 
-    discriminator = DiscriminatorModel(N_at,args.N_classes) 
-    generator = GeneratorModel(N_at,args.noise_dim,args.N_classes,box_s) 
+    # Define MDAnalysis universe and related parameters
+    univ = mda.Universe(prmf, trajfs)
+    nframes = len(univ.trajectory)
+    batch_freq = int(nframes/args.batch_size) 
+    N_at = len(univ.select_atoms('all'))
+    box_s = max_size(prmf,trajfs,'all',1.1) # Calculate largest coordinate for generation
+
+    # Generate data
+    dataset,atoms_list = generate_training_data(prmf, trajfs, 0, nframes-(nframes%args.batch_size), backbone, args.dist_cut, args.output_directory)
+
+    # Define discriminator and generator models
+    discriminator = DiscriminatorModel(N_at, args.N_classes, n1=50, n2=100, n3=200) 
+    generator = GeneratorModel(N_at, args.noise_dim, args.N_classes, box_s, n1=200, n2=100, n3=50) 
     discriminator.to(device)
     generator.to(device)
     if (args.load_model==True and os.path.isfile(model_g_file) and os.path.isfile(model_d_file)):
@@ -289,22 +290,24 @@ def main():
     # For a conditional GAN, the loss function is the Binary Cross Entropy between the target and the input probabilities
     loss = nn.BCELoss() 
 
+    # Define optimizers
     discriminator_optimizer = optim.Adam(discriminator.parameters(), lr=args.learning_rate) 
     generator_optimizer = optim.Adam(generator.parameters(), lr=args.learning_rate)
 
+    # Load data
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
-    
+
     if args.train_mode:
-        summary_writer=SummaryWriter(args.output_directory)
+        summary_writer = SummaryWriter(args.output_directory)
         
         # initialize lists for observables and graphs.
-        e2e_distance=[]
-        bonds_dev=[]
-        angles_dev=[]
-        losses_fig=plt.figure(1, figsize=(4, 4))
-        e2e_fig=plt.figure(1, figsize=(4, 4))
-        bonds_fig=[]
-        angles_fig=[]
+        e2e_distance = []
+        bonds_dev = []
+        angles_dev = []
+        losses_fig = plt.figure(1, figsize=(4, 4))
+        e2e_fig = plt.figure(1, figsize=(4, 4))
+        bonds_fig = []
+        angles_fig = []
         for dl, d_label in enumerate(args.desired_labels):
             e2e_distance.append([])
             bonds_dev.append([])
@@ -322,7 +325,7 @@ def main():
                 # Generate noise and move it the device
                 noise = torch.randn(args.batch_size,args.noise_dim).to(device) 
                 # Forward pass
-                fake_labels=torch.randint(0,args.N_classes,(args.batch_size,)).to(device)
+                fake_labels = torch.randint(0,args.N_classes,(args.batch_size,)).to(device)
                 generated_data = generator(noise, fake_labels) 
                 
                 true_data = data_input[0].view(args.batch_size, 3*N_at).to(device) 
@@ -372,7 +375,7 @@ def main():
                             for x in generated_data:
 
                                 # Generate .inpcrd file
-                                outname='out_'+outmode+'_label'+str(fake_labels[0].item())+'_epoch'+str(last_epoch+epoch_idx+1)+'.inpcrd'
+                                outname='out_label'+str(fake_labels[0].item())+'_epoch'+str(last_epoch+epoch_idx+1)+'.inpcrd'
                                 write_inpcrd(x.detach().numpy().reshape(N_at,3),outname=args.output_directory+outname)
                                 if (epoch_idx+1)%args.log_freq==0: print("{} written.".format(outname))
 
@@ -394,8 +397,8 @@ def main():
                 print('[%d/%d]: loss_d: %.3f, loss_g: %.3f' % ( (epoch_idx+last_epoch+1), args.n_epochs+last_epoch, torch.mean(torch.FloatTensor(D_loss)), torch.mean(torch.FloatTensor(G_loss))))
 
         # Plot loss averages over batches
-        plt.plot(np.array(Loss_D_mean)[:, 0], np.array(Loss_D_mean)[:, 1],lw=1,c='C0',label='Loss D')
-        plt.plot(np.array(Loss_G_mean)[:, 0], np.array(Loss_G_mean)[:, 1],lw=1,c='C1',label='Loss G')
+        plt.plot(np.array(Loss_D_mean)[:, 0], np.array(Loss_D_mean)[:, 1],lw=1,c='C0',label='Discriminator')
+        plt.plot(np.array(Loss_G_mean)[:, 0], np.array(Loss_G_mean)[:, 1],lw=1,c='C1',label='Generator')
         plt.legend(loc='upper right',prop={'size':15})
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
@@ -438,7 +441,7 @@ def main():
                     fake_labels = torch.tensor(args.batch_size*[dl]).to(device) 
                     generated_data = generator(noise, fake_labels).cpu().view(args.batch_size, 3*N_at) 
                     for x in generated_data:
-                        outname='gen_'+outmode+'_label'+str(fake_labels[0].item())+'_'+str(structure_idx+1)+'.inpcrd' 
+                        outname='gen_label'+str(fake_labels[0].item())+'_'+str(structure_idx+1)+'.inpcrd' 
                         write_inpcrd(x.detach().numpy().reshape(N_at,3),outname=args.output_directory+outname)
                         print("{} written.".format(outname))
                         break
