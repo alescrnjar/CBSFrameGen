@@ -20,15 +20,15 @@ The output .inpcrd files can be visualized with VMD (or pymol): load the paramet
 
 Python modules required: 
 
-numpy : 1.22.3
+numpy [>=] 1.22.3
 
-torch : 1.12.1+cu116
+torch >= 1.12.1+cu116
 
-MDAnalysis : 2.2.0
+MDAnalysis >= 2.2.0
 
-ParmEd: 3.4.3 
+ParmEd >= 3.4.3 
 
-tensorboardX: 2.5.1
+tensorboardX >= 2.5.1
 
 # Case Study
 
