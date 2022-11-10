@@ -1,25 +1,13 @@
-import torch
-import torch.nn as nn
-from torch import optim as optim
-#
-import MDAnalysis as mda
-#from MDAnalysis.lib.distances import distance_array 
-from numpy.linalg import norm
-import MDAnalysis.analysis.rms
-from MDAnalysis.analysis import align
-#
-import numpy as np
 import os
-import matplotlib.pyplot as plt
-#
-from tensorboardX import SummaryWriter  
-#
-import argparse
-#
 import sys
 sys.path.append('./src/')
 from functions import *
 from models import *
+from plots import *
+#
+from tensorboardX import SummaryWriter  
+#
+import argparse
 
 parser = argparse.ArgumentParser()
 
@@ -57,8 +45,6 @@ trajfs = ['/home/acrnjar/Desktop/TEMP/Peptides_gen/all_conformations.mdcrd'] # T
 
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Cuda is available:",torch.cuda.is_available())
-
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
 def main():
 
@@ -100,7 +86,7 @@ def main():
     box_s = max_size(prmf,trajfs,'all',1.1) # Calculate largest coordinate for generation
 
     # Generate data
-    dataset,atoms_list = generate_training_data(prmf, trajfs, 0, nframes-(nframes%args.batch_size), backbone, args.dist_cut, args.output_directory)
+    dataset, atoms_list = generate_training_data(prmf, trajfs, 0, nframes-(nframes%args.batch_size), backbone, args.dist_cut, args.output_directory)
 
     # Define discriminator and generator models
     discriminator = DiscriminatorModel(N_at, args.N_classes, n1=50, n2=100, n3=200) 
@@ -129,66 +115,25 @@ def main():
         e2e_distance = []
         bonds_dev = []
         angles_dev = []
-        losses_fig = plt.figure(1, figsize=(4, 4))
-        e2e_fig = plt.figure(1, figsize=(4, 4))
-        bonds_fig = []
-        angles_fig = []
+        
         for dl, d_label in enumerate(args.desired_labels):
             e2e_distance.append([])
             bonds_dev.append([])
             angles_dev.append([])
-            bonds_fig.append(plt.figure(1, figsize=(4, 4)))
-            angles_fig.append(plt.figure(1, figsize=(4, 4)))
         
         Loss_G_mean = []
         Loss_D_mean = []
         for epoch_idx in range(args.n_epochs): 
+
             G_loss = [] 
             D_loss = []    
             for batch_idx, data_input in enumerate(data_loader):
             
-                # Generate noise and move it the device
-                noise = torch.randn(args.batch_size,args.noise_dim).to(device) 
-                # Forward pass
-                fake_labels = torch.randint(0,args.N_classes,(args.batch_size,)).to(device)
-                generated_data = generator(noise, fake_labels) 
-                
-                true_data = data_input[0].view(args.batch_size, 3*N_at).to(device) 
-                digit_labels = data_input[1].to(device) 
-                true_labels = torch.ones(args.batch_size).to(device) 
+                loss_d, loss_g = training(discriminator, discriminator_optimizer, generator, generator_optimizer, loss, data_input, args.batch_size, args.noise_dim, args.N_classes, N_at)
+                G_loss.append(loss_g)
+                D_loss.append(loss_d)
 
-                # Clear optimizer gradients        
-                discriminator_optimizer.zero_grad()
-                # Forward pass with true data as input
-                discriminator_output_for_true_data = discriminator(true_data,digit_labels).view(args.batch_size) 
-                # Compute Loss
-                true_discriminator_loss = loss(discriminator_output_for_true_data, true_labels) 
-                
-                # Forward pass with generated data as input
-                discriminator_output_for_generated_data = discriminator(generated_data.detach(), fake_labels).view(args.batch_size) 
-                # Compute Loss
-                generator_discriminator_loss = loss(discriminator_output_for_generated_data, torch.zeros(args.batch_size).to(device)) 
-                # Average the loss
-                discriminator_loss = (true_discriminator_loss + generator_discriminator_loss) / 2 
-                # Backpropagate the losses for Discriminator model.
-                discriminator_loss.backward()
-                discriminator_optimizer.step()
-                D_loss.append(discriminator_loss.data.item())
-                
-                # Clear optimizer gradients
-                generator_optimizer.zero_grad()        
-                # It's a choice to generate the data again 
-                generated_data = generator(noise, fake_labels) #.requires_grad_(False) 
-                # Forward pass with the generated data
-                discriminator_output_on_generated_data = discriminator(generated_data, fake_labels).view(args.batch_size) 
-                # Compute loss: it must be the same of the discriminator, but reversed: the fake data must be passed as all ones, thus we use true_labels
-                generator_loss = loss(discriminator_output_on_generated_data, true_labels) 
-                # Backpropagate losses for Generator model.
-                generator_loss.backward()
-                generator_optimizer.step()
-                G_loss.append(generator_loss.data.item())
-                
-                if (batch_idx==0 and epoch_idx==0): print("Initial: discriminator_loss: {} , generator_loss: {}".format(discriminator_loss.item(),generator_loss.item()))
+                if (batch_idx==0 and epoch_idx==0): print("Initial: discriminator_loss: {} , generator_loss: {}".format(loss_d, loss_g))
 
                 # Evaluate the model
                 if ((batch_idx + 1)% batch_freq == 0 and (epoch_idx + 1)%args.epoch_freq == 0): 
@@ -222,39 +167,14 @@ def main():
                 print('[%d/%d]: loss_d: %.3f, loss_g: %.3f' % ( (epoch_idx+last_epoch+1), args.n_epochs+last_epoch, torch.mean(torch.FloatTensor(D_loss)), torch.mean(torch.FloatTensor(G_loss))))
 
         # Plot loss averages over batches
-        plt.plot(np.array(Loss_D_mean)[:, 0], np.array(Loss_D_mean)[:, 1],lw=1,c='C0',label='Discriminator')
-        plt.plot(np.array(Loss_G_mean)[:, 0], np.array(Loss_G_mean)[:, 1],lw=1,c='C1',label='Generator')
-        plt.legend(loc='upper right',prop={'size':15})
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        losses_fig.savefig(args.output_directory+'Losses.png',dpi=150)
-        #plt.show()
-        plt.clf()
+        plot_losses(Loss_D_mean, Loss_G_mean, args.output_directory)
 
         # Plot observables
         for dl, d_label in enumerate(args.desired_labels):
-            plt.plot(np.array(bonds_dev[dl])[:, 0], np.array(bonds_dev[dl])[:, 1],lw=1,c='C0')
-            plt.xlabel('Epoch')
-            plt.ylabel('Bonds dev. [$\AA$]')
-            bonds_fig[dl].savefig(args.output_directory+'Bonds_deviation_label'+str(d_label)+'.png',dpi=150)
-            #plt.show()
-            plt.clf()
-            plt.plot(np.array(angles_dev[dl])[:, 0], np.array(angles_dev[dl])[:, 1],lw=1,c='C1')
-            plt.xlabel('Epoch')
-            plt.ylabel('Angle dev. [deg]')
-            angles_fig[dl].savefig(args.output_directory+'Angles_deviation_label'+str(d_label)+'.png',dpi=150)
-            #plt.show()
-            plt.clf()
+            plot_observables(d_label, bonds_dev[dl], angles_dev[dl], args.output_directory)
 
         # Plot the end-to-end distances
-        for dl, d_label in enumerate(args.desired_labels):
-            plt.plot(np.array(e2e_distance[dl])[:, 0], np.array(e2e_distance[dl])[:, 1],lw=1,c='C'+str(dl),label='Label '+str(d_label))
-        plt.xlabel('Epoch')
-        plt.ylabel('End-to-end distance [$\AA$]')
-        plt.legend(loc='upper right',prop={'size':15})
-        e2e_fig.savefig(args.output_directory+'End2end_distances.png',dpi=150)
-        #plt.show()
-        plt.clf()
+        plot_e2e(e2e_distance, args.desired_labels, args.output_directory)
 
     # Test mode
     else: 
