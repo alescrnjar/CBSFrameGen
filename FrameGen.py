@@ -15,13 +15,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--train_mode', default=True, type=bool) # Set to False for Test mode.
 parser.add_argument('--load_model', default=False, type=bool)
 
+# Bio-system settings
+parser.add_argument('--biosystem', default='PROTEIN', type=str) # Necessary for atom selections (see below)
+parser.add_argument('--topology', default='peptide.prmtop', type=str) # Parameter and topology file
+parser.add_argument('--trajectory', default='all_conformations.mdcrd', type=str) # Trajectory file
+
 # Classes settings
 parser.add_argument('--dist_cut', default=10.0, type=float) # distance cut-off for class defintion
 parser.add_argument('--N_classes', default=2, type=int) # Number of classes
 parser.add_argument('--desired_labels', default=[0,1], type=list) # Classes to be considered for output
-
-# Bio-system settings
-parser.add_argument('--biosystem', default='PROTEIN', type=str) # Necessary for atom selections (see below)
 
 # Model settings
 parser.add_argument('--n_epochs', default=1000, type=int) # Number of epochs for training
@@ -39,10 +41,6 @@ parser.add_argument('--output_directory', default='./example_output/', type=str)
 
 args = parser.parse_args()
 
-prmf = args.input_directory+'peptide.prmtop' # Parameter and topology file
-#trajfs = [args.input_directory+'all_conformations.mdcrd'] # Trajectory files list
-trajfs = ['/home/acrnjar/Desktop/TEMP/Peptides_gen/all_conformations.mdcrd'] # Trajectory files list
-
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Cuda is available:",torch.cuda.is_available())
 
@@ -50,6 +48,9 @@ def main():
 
     print("Output will be written in:",args.output_directory)
     if not os.path.exists(args.output_directory): os.system('mkdir '+args.output_directory)
+
+    prmf = args.input_directory + args.topology
+    trajfs = args.input_directory + args.trajectory 
 
     if args.biosystem=='PROTEIN':
         backbone='name CA C N'
