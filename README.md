@@ -22,13 +22,15 @@ Python modules required:
 
 * numpy >= 1.22.3
 
-* torch >= 1.12.1+cu116
+* torch >= 1.12.1+cu116 (pip install torch==1.12.1+cu116 -f https://download.pytorch.org/whl/torch_stable.html)
 
 * MDAnalysis >= 2.2.0
 
 * ParmEd >= 3.4.3 
 
 * tensorboardX >= 2.5.1
+
+* matplotlib.pyplot >= 3.4.3
 
 # Modules
 
